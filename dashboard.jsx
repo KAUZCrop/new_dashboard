@@ -50,16 +50,16 @@ function TerminalDashboard(){
   };
 
   // ─── data slicing ────────────────────────────────────────
-  const allDates = React.useMemo(()=>[...new Set(D.ROWS.map(r=>r.date))].sort(), []);
+  const allDates = React.useMemo(()=>[...new Set(D.ROWS.map(r=>r.date))].sort(), [D.ROWS]);
   const cutoff = allDates[Math.max(0, allDates.length-periodDays)];
   const rows = React.useMemo(
     () => D.ROWS.filter(r =>
-      r.date >= cutoff &&
+      (!cutoff || r.date >= cutoff) &&
       (activeCampaign==="ALL" || r.campaign===activeCampaign) &&
       (mediaSel.size === 0  || mediaSel.has(r.media)) &&
       (deviceSel.size === 0 || deviceSel.has(r.device))
     ),
-    [periodDays, activeCampaign, mediaSel, deviceSel]
+    [D.ROWS, cutoff, periodDays, activeCampaign, mediaSel, deviceSel]
   );
   const prevRows = React.useMemo(
     () => D.prevPeriodRows(rows).filter(r =>
