@@ -88,18 +88,8 @@ function TerminalDashboard(){
   const campAgg  = D.byCampaign(rows);
   const devAgg   = D.byDevice(rows);
 
-  // campaign goal type map (ROAS / CPA) — built from all rows so it survives filtering
-  const campaignGoalMap = React.useMemo(() => {
-    const map = new Map();
-    D.ROWS.forEach(r => {
-      if (r.campaign && r.goalType && !map.has(r.campaign)) {
-        const t = String(r.goalType).toUpperCase().trim();
-        map.set(r.campaign, t.includes("CPA") ? "CPA" : "ROAS");
-      }
-    });
-    return map;
-  }, []);
-  const isCPA = activeCampaign !== "ALL" && campaignGoalMap.get(activeCampaign) === "CPA";
+  // 매출 데이터가 없으면 ROAS·매출 숨김
+  const isCPA = t.revenue === 0;
 
   // delta helper
   const delta = (a, b) => b ? ((a-b)/b) : 0;
