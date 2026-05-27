@@ -143,6 +143,8 @@ async function loadFromSheets(config){
     const i = headers.findIndex(h => String(h).trim() === String(headerName).trim());
     if (i >= 0) idx[field] = i;
   }
+  console.info("[DASH] 컬럼 인덱스:", idx);
+  console.info("[DASH] 헤더 전체:", headers);
   const numericField = k => ["impressions","clicks","cost","conversions","revenue"].includes(k);
   const rows = values.slice(1).filter(r => r.length).map((r, i) => {
     const row = { id: i };
@@ -152,11 +154,11 @@ async function loadFromSheets(config){
       if (numericField(field)) v = Number(String(v).replace(/[^\d.-]/g,"")) || 0;
       row[field] = v;
     }
-    // back-compat fields used by aggregations
     row.mediaLabel = row.media;
     row.campaignLabel = row.campaign;
     return row;
   });
+  console.info("[DASH] 파싱된 첫 3행:", rows.slice(0, 3));
   // derive unique media + campaign lists from the data
   const seenMedia = new Map(), seenCamp = new Map();
   rows.forEach(r => {
