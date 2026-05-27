@@ -37,7 +37,7 @@ const DEVICES = ["PC", "MO"];
 
 // ─── helpers ──────────────────────────────────────────────
 function rng(seed){ let s = seed; return () => { s = (s*9301+49297) % 233280; return s/233280; }; }
-function sum(arr, k){ return arr.reduce((a,r)=>a+r[k], 0); }
+function sum(arr, k){ return arr.reduce((a,r)=>a+(r[k]||0), 0); }
 
 // ─── mock data generator (used when no sheet configured) ──
 function buildMockRows(){

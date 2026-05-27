@@ -88,8 +88,8 @@ function TerminalDashboard(){
   const campAgg  = D.byCampaign(rows);
   const devAgg   = D.byDevice(rows);
 
-  // 매출 데이터가 없으면 ROAS·매출 숨김
-  const isCPA = t.revenue === 0;
+  // 매출 데이터가 없거나 0이면 ROAS·매출 숨김 (NaN 포함)
+  const isCPA = !(t.revenue > 0);
 
   // delta helper
   const delta = (a, b) => b ? ((a-b)/b) : 0;
