@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>광고 캠페인 성과 대시보드</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  html, body { margin:0; padding:0; width:100%; background:#FAFAF5; }
+  body { font-family:'Pretendard','IBM Plex Sans',system-ui,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh; }
+  #root { min-height:100vh; }
+  * { box-sizing: border-box; }
+  /* loading overlay */
+  #boot { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; font-family:'JetBrains Mono', monospace; font-size:12px; color:#6B665C; background:#FAFAF5; z-index:9999; transition: opacity .3s; }
+  #boot.hide { opacity:0; pointer-events:none; }
+  #boot .spinner { width:32px; height:32px; border:2px solid #D8D5CC; border-top-color:#C2410C; border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #boot .err { color:#B91C1C; max-width:480px; text-align:center; padding:12px 16px; background:#FFF; border:1px solid #D8D5CC; }
+</style>
+</head>
+<body style="font-size: 22px">
+<div id="root"></div>
+<div id="boot">
+  <div class="spinner"></div>
+  <div>데이터 불러오는 중…</div>
+</div>
+
+<!-- ───────────────────── React + Babel ───────────────────── -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- ───────────────────── App scripts ─────────────────────── -->
+<script src="config.js"></script>
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="charts.jsx"></script>
+<script type="text/babel" src="dashboard.jsx"></script>
+
+<!-- ───────────────────── Boot ────────────────────────────── -->
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+function App(){
+  // bump counter to force re-render after async data load
+  const [, bump] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer;
+    async function loadAndRender(){
+      try {
+        await window.DASH.load(window.CONFIG || {});
+      } catch (e) {
+        console.error("[boot] load failed:", e);
+      }
+      if (cancelled) return;
+      bump(n => n+1);
+      const bootEl = document.getElementById("boot");
+      if (bootEl) bootEl.style.display = "none";
+      // auto-refresh
+      const mins = Number(window.CONFIG?.REFRESH_MIN) || 0;
+      if (mins > 0) timer = setTimeout(loadAndRender, mins*60*1000);
+    }
+    loadAndRender();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, []);
+
+  // window.TerminalDashboard is defined in dashboard.jsx
+  if (!window.TerminalDashboard) return null;
+  return <window.TerminalDashboard/>;
+}
+
+// wait one tick so all <script type="text/babel"> have compiled & registered globals
+setTimeout(() => {
+  ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+}, 60);
+</script>
+</body>
+</html>

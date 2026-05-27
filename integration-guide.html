@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<title>Google Sheets · Drive 연동 가이드</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Pretendard:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:#F4F4F0; --paper:#FFFFFF; --fg:#16161A; --muted:#5C544A; --faint:#A8A7A0;
+    --border:#E4E2DA; --grid:#ECEAE3; --accent:#1B47D9; --accentSoft:#E8EEFF;
+    --green:#0E8C5C; --red:#C42E1F; --amber:#B86E0B;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --sans: 'Pretendard', 'Inter', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--fg); font-family:var(--sans); font-size:14px; line-height:1.6; }
+  .wrap { max-width:1080px; margin:0 auto; padding:48px 32px 80px; }
+  header { border-bottom:1px solid var(--border); padding-bottom:24px; margin-bottom:32px; }
+  .kicker { font-family:var(--mono); font-size:11px; letter-spacing:2px; color:var(--accent); font-weight:700; text-transform:uppercase; }
+  h1 { font-size:36px; font-weight:800; letter-spacing:-1px; margin:6px 0 8px; }
+  .sub { color:var(--muted); font-size:15px; max-width:680px; }
+  .badges { display:flex; gap:8px; margin-top:14px; }
+  .badge { font-family:var(--mono); font-size:10.5px; padding:3px 9px; border-radius:4px; background:var(--paper); border:1px solid var(--border); color:var(--muted); }
+  .layout { display:grid; grid-template-columns:200px 1fr; gap:40px; }
+  nav { position:sticky; top:24px; align-self:flex-start; }
+  nav .nav-title { font-family:var(--mono); font-size:10px; letter-spacing:2px; color:var(--faint); font-weight:700; margin-bottom:10px; }
+  nav a { display:block; padding:6px 10px; font-size:12.5px; color:var(--muted); text-decoration:none; border-left:2px solid var(--border); margin-bottom:2px; }
+  nav a:hover { color:var(--fg); border-color:var(--fg); }
+  nav a.active { color:var(--accent); border-color:var(--accent); font-weight:600; background:var(--accentSoft); }
+  main { min-width:0; }
+  section { margin-bottom:48px; scroll-margin-top:24px; }
+  h2 { font-size:22px; font-weight:700; letter-spacing:-0.3px; margin:0 0 8px; padding-top:6px; }
+  h3 { font-size:16px; font-weight:700; margin:22px 0 8px; }
+  p { margin:0 0 12px; }
+  .step { background:var(--paper); border:1px solid var(--border); border-radius:8px; padding:18px 22px; margin-bottom:16px; position:relative; padding-left:64px; }
+  .step-num { position:absolute; left:18px; top:18px; width:30px; height:30px; border-radius:50%; background:var(--accent); color:white; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; font-size:13px; }
+  .step h4 { font-size:14px; font-weight:700; margin:0 0 6px; }
+  .step p { font-size:13px; color:var(--muted); margin:0 0 8px; }
+  .step ul { padding-left:18px; font-size:13px; color:var(--muted); margin:6px 0; }
+  .step li { margin-bottom:4px; }
+  code { font-family:var(--mono); font-size:12px; background:var(--accentSoft); color:var(--accent); padding:1px 6px; border-radius:3px; }
+  pre { background:#16161A; color:#E6E1CF; padding:16px 20px; border-radius:8px; overflow-x:auto; font-family:var(--mono); font-size:12px; line-height:1.55; }
+  pre .k { color:#FFB454; }  /* keyword */
+  pre .s { color:#7FD962; }  /* string */
+  pre .c { color:#7C8493; font-style:italic; } /* comment */
+  pre .n { color:#59C2FF; }  /* fn / type */
+  pre .v { color:#D2A6FF; }  /* var */
+  .callout { border-left:3px solid var(--accent); background:var(--accentSoft); padding:12px 16px; border-radius:0 6px 6px 0; margin:14px 0; font-size:13px; }
+  .callout.warn { border-color:var(--amber); background:#FFF6E8; }
+  .callout.warn strong { color:var(--amber); }
+  .callout strong { color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; margin:12px 0; }
+  th { text-align:left; padding:8px 12px; background:var(--paper); border:1px solid var(--border); font-weight:600; font-size:11px; letter-spacing:0.5px; text-transform:uppercase; color:var(--muted); }
+  td { padding:8px 12px; border:1px solid var(--border); background:var(--paper); }
+  td code { font-size:11px; }
+  .col-mono { font-family:var(--mono); }
+  .lined { display:flex; align-items:center; gap:8px; margin:8px 0 12px; }
+  .lined::after { content:""; flex:1; height:1px; background:var(--border); }
+  .lined-label { font-family:var(--mono); font-size:10px; letter-spacing:2px; color:var(--faint); font-weight:700; }
+  .back-link { display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11px; color:var(--muted); text-decoration:none; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--paper); }
+  .back-link:hover { color:var(--accent); border-color:var(--accent); }
+  .checklist { background:var(--paper); border:1px solid var(--border); border-radius:8px; padding:16px 20px; }
+  .checklist label { display:flex; gap:10px; align-items:flex-start; padding:6px 0; font-size:13px; cursor:pointer; }
+  .checklist input { margin-top:3px; }
+  .arch { background:var(--paper); border:1px solid var(--border); border-radius:8px; padding:24px; display:flex; align-items:center; justify-content:center; gap:24px; margin:14px 0; flex-wrap:wrap; }
+  .arch-node { text-align:center; min-width:120px; }
+  .arch-icon { width:60px; height:60px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 8px; }
+  .arch-icon.sheet { background:#0F9D58; color:white; }
+  .arch-icon.drive { background:#FBBC04; color:white; }
+  .arch-icon.api { background:var(--fg); color:white; }
+  .arch-icon.dash { background:var(--accent); color:white; }
+  .arch-name { font-weight:700; font-size:13px; }
+  .arch-sub { font-size:10.5px; color:var(--muted); margin-top:2px; font-family:var(--mono); }
+  .arch-arrow { font-family:var(--mono); color:var(--muted); font-size:18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a href="index.html" class="back-link">← 대시보드 시안으로 돌아가기</a>
+  <header>
+    <div class="kicker">SETUP GUIDE · v1.0</div>
+    <h1>Google Sheets + Drive 연동 가이드</h1>
+    <p class="sub">시트의 캠페인 성과 데이터와 드라이브의 광고 소재를 자동으로 불러와 대시보드에 표시하는 방법을 단계별로 설명합니다. OAuth 2.0 인증 흐름과 서비스 계정 인증 두 가지 패턴을 모두 다룹니다.</p>
+    <div class="badges">
+      <span class="badge">Google Sheets API v4</span>
+      <span class="badge">Google Drive API v3</span>
+      <span class="badge">OAuth 2.0 / Service Account</span>
+      <span class="badge">예상 소요: 30분</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav>
+      <div class="nav-title">CONTENTS</div>
+      <a href="#architecture" class="active">아키텍처</a>
+      <a href="#prereq">사전 준비</a>
+      <a href="#gcp">1. GCP 프로젝트 설정</a>
+      <a href="#sheets">2. Sheets API 연동</a>
+      <a href="#drive">3. Drive 이미지 연동</a>
+      <a href="#schema">4. 시트 스키마 매핑</a>
+      <a href="#auth-patterns">5. 인증 패턴</a>
+      <a href="#refresh">6. 자동 동기화</a>
+      <a href="#checklist">최종 체크리스트</a>
+    </nav>
+
+    <main>
+      <section id="architecture">
+        <div class="lined"><span class="lined-label">OVERVIEW</span></div>
+        <h2>아키텍처</h2>
+        <p>대시보드는 두 개의 데이터 소스를 갖습니다 — <strong>Google Sheets</strong>(수치 데이터)와 <strong>Google Drive</strong>(소재 이미지). 두 소스 모두 Google API를 통해 읽어옵니다.</p>
+        <div class="arch">
+          <div class="arch-node">
+            <div class="arch-icon sheet">⊞</div>
+            <div class="arch-name">Google Sheets</div>
+            <div class="arch-sub">campaign-perf!A:K</div>
+          </div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node">
+            <div class="arch-icon api">⚙</div>
+            <div class="arch-name">Backend / Apps Script</div>
+            <div class="arch-sub">fetch · normalize · cache</div>
+          </div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node">
+            <div class="arch-icon dash">◐</div>
+            <div class="arch-name">Dashboard</div>
+            <div class="arch-sub">render</div>
+          </div>
+          <div class="arch-arrow">←</div>
+          <div class="arch-node">
+            <div class="arch-icon drive">△</div>
+            <div class="arch-name">Google Drive</div>
+            <div class="arch-sub">/creatives/*.png</div>
+          </div>
+        </div>
+        <div class="callout">
+          <strong>두 가지 선택지가 있어요:</strong>
+          <ul style="margin:6px 0 0; padding-left:18px;">
+            <li><b>A. Apps Script + 게시 웹앱</b> — 코드를 시트에 붙여 넣고 웹앱으로 공개. 추가 서버 불필요. <em>(초기 셋업 가장 빠름)</em></li>
+            <li><b>B. 별도 백엔드 (Node.js/Python)</b> — 토큰 관리·캐싱·여러 시트 동시 처리에 유리. <em>(확장에 유리)</em></li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="prereq">
+        <div class="lined"><span class="lined-label">PREREQUISITES</span></div>
+        <h2>사전 준비</h2>
+        <ul>
+          <li>Google 계정 (시트와 드라이브 폴더 접근 권한 보유)</li>
+          <li>Google Cloud Platform 콘솔 접근: <code>console.cloud.google.com</code></li>
+          <li>대시보드 호스팅 URL (또는 로컬 <code>http://localhost</code> 개발 환경)</li>
+        </ul>
+      </section>
+
+      <section id="gcp">
+        <div class="lined"><span class="lined-label">STEP 01 — GCP</span></div>
+        <h2>1. GCP 프로젝트 설정</h2>
+
+        <div class="step">
+          <div class="step-num">1</div>
+          <h4>새 프로젝트 생성</h4>
+          <p>GCP 콘솔 상단 프로젝트 선택 → <code>새 프로젝트</code> → 이름 입력 (예: <code>campaign-dashboard</code>).</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h4>API 활성화</h4>
+          <p>"API 및 서비스" → "라이브러리" 에서 다음 두 API 검색 후 활성화:</p>
+          <ul>
+            <li><code>Google Sheets API</code></li>
+            <li><code>Google Drive API</code></li>
+          </ul>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h4>자격증명 생성</h4>
+          <p>"API 및 서비스" → "사용자 인증 정보" → "+ 사용자 인증 정보 만들기":</p>
+          <ul>
+            <li><b>API 키</b> — 공개 시트라면 이것만으로 충분. 클라이언트에서 직접 호출.</li>
+            <li><b>OAuth 2.0 클라이언트 ID</b> — 사용자별 시트에 접근할 때.</li>
+            <li><b>서비스 계정</b> — 백엔드/Apps Script에서 비대화식 접근.</li>
+          </ul>
+          <div class="callout warn">
+            <strong>주의:</strong> API 키는 도메인 제한(HTTP referer)을 반드시 걸어두세요. 노출되면 누구나 사용 가능합니다.
+          </div>
+        </div>
+      </section>
+
+      <section id="sheets">
+        <div class="lined"><span class="lined-label">STEP 02 — SHEETS</span></div>
+        <h2>2. Google Sheets API 연동</h2>
+        <p>가장 단순한 방식은 시트를 <em>"링크가 있는 모든 사용자 보기"</em>로 공유하고 API 키로 직접 읽는 것입니다.</p>
+
+        <h3>2-1. 시트 공유 설정</h3>
+        <ul>
+          <li>스프레드시트 우측 상단 <code>공유</code> → "링크가 있는 모든 사용자" → "뷰어"</li>
+          <li>또는 서비스 계정 이메일(<code>xxx@xxx.iam.gserviceaccount.com</code>)을 뷰어로 추가</li>
+        </ul>
+
+        <h3>2-2. 시트 ID 확인</h3>
+        <p>시트 URL에서 <code>/d/</code> 다음에 오는 긴 문자열입니다.</p>
+        <pre><span class="c">// 예시 URL</span>
+https://docs.google.com/spreadsheets/d/<span class="s">1aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789</span>/edit
+                                       └────────── SHEET_ID ──────────┘</pre>
+
+        <h3>2-3. JS로 데이터 읽기</h3>
+        <pre><span class="k">const</span> <span class="v">SHEET_ID</span> = <span class="s">"1aBcDeFg..."</span>;
+<span class="k">const</span> <span class="v">RANGE</span>    = <span class="s">"campaign-perf!A1:K"</span>;
+<span class="k">const</span> <span class="v">API_KEY</span>  = <span class="s">"AIzaSy..."</span>;  <span class="c">// referer 제한 권장</span>
+
+<span class="k">async function</span> <span class="n">fetchRows</span>() {
+  <span class="k">const</span> url = <span class="s">`https://sheets.googleapis.com/v4/spreadsheets/</span>${SHEET_ID}<span class="s">/values/</span>${RANGE}<span class="s">?key=</span>${API_KEY}<span class="s">`</span>;
+  <span class="k">const</span> res = <span class="k">await</span> <span class="n">fetch</span>(url);
+  <span class="k">const</span> { values } = <span class="k">await</span> res.<span class="n">json</span>();
+  <span class="k">const</span> [headers, ...data] = values;
+  <span class="k">return</span> data.<span class="n">map</span>(row =>
+    headers.<span class="n">reduce</span>((obj, key, i) => ({ ...obj, [key]: row[i] }), {})
+  );
+}</pre>
+
+        <div class="callout">
+          <strong>대량 데이터:</strong> 5,000 행 이상이면 <code>batchGet</code> 또는 페이지네이션을 고려하세요. Apps Script 사용 시 <code>SpreadsheetApp.getRange(...).getValues()</code> 로 가장 빠릅니다.
+        </div>
+      </section>
+
+      <section id="drive">
+        <div class="lined"><span class="lined-label">STEP 03 — DRIVE</span></div>
+        <h2>3. Drive 이미지 연동</h2>
+        <p>광고 소재 이미지는 Google Drive의 특정 폴더에 정리되어 있고, 파일명 또는 메타데이터로 시트의 캠페인/광고그룹과 매핑됩니다.</p>
+
+        <h3>3-1. 폴더 구조 권장</h3>
+        <pre><span class="v">/creatives</span>
+├── <span class="v">2026-Q2/</span>
+│   ├── <span class="s">[BR_MAIN][NVR-SA][PC]_v1.png</span>
+│   ├── <span class="s">[PR_NEW][META][MO]_v3.jpg</span>
+│   └── <span class="s">[EV_MAY][YT][MO]_v1.png</span>
+└── <span class="v">2026-Q1/</span></pre>
+        <p>파일명을 <code>[캠페인키][매체키][기기]_버전.확장자</code> 패턴으로 통일하면 매핑이 자동화됩니다.</p>
+
+        <h3>3-2. 폴더 내 파일 목록 가져오기</h3>
+        <pre><span class="k">const</span> <span class="v">FOLDER_ID</span> = <span class="s">"1xYz..."</span>;  <span class="c">// 드라이브 폴더 URL 끝부분</span>
+
+<span class="k">async function</span> <span class="n">listCreatives</span>() {
+  <span class="k">const</span> q = <span class="s">`'</span>${FOLDER_ID}<span class="s">' in parents and mimeType contains 'image/'`</span>;
+  <span class="k">const</span> url = <span class="s">`https://www.googleapis.com/drive/v3/files`</span>
+            + <span class="s">`?q=</span>${<span class="n">encodeURIComponent</span>(q)}<span class="s">`</span>
+            + <span class="s">`&fields=files(id,name,thumbnailLink,webContentLink)`</span>
+            + <span class="s">`&key=</span>${API_KEY}<span class="s">`</span>;
+  <span class="k">const</span> res = <span class="k">await</span> <span class="n">fetch</span>(url);
+  <span class="k">const</span> { files } = <span class="k">await</span> res.<span class="n">json</span>();
+  <span class="k">return</span> files;
+}</pre>
+
+        <h3>3-3. 이미지를 &lt;img&gt;로 표시</h3>
+        <p>Drive 이미지는 <code>thumbnailLink</code>(소형) 또는 다음 형식의 직접 URL로 임베드합니다:</p>
+        <pre><span class="c">// 1) 썸네일 — 빠르고 인증 불필요 (공유 폴더)</span>
+&lt;<span class="k">img</span> <span class="n">src</span>=<span class="s">"https://drive.google.com/thumbnail?id=FILE_ID&sz=w400"</span>/&gt;
+
+<span class="c">// 2) 직접 임베드 — 풀 사이즈</span>
+&lt;<span class="k">img</span> <span class="n">src</span>=<span class="s">"https://lh3.googleusercontent.com/d/FILE_ID=w800"</span>/&gt;
+
+<span class="c">// 3) iframe 미리보기 — PDF/문서</span>
+&lt;<span class="k">iframe</span> <span class="n">src</span>=<span class="s">"https://drive.google.com/file/d/FILE_ID/preview"</span>/&gt;</pre>
+
+        <div class="callout warn">
+          <strong>주의:</strong> Drive 이미지를 외부 사이트에 임베드하려면 파일이 "링크가 있는 모든 사용자에게 공개" 상태여야 합니다. 비공개 파일은 OAuth 토큰으로 다운로드 후 Blob URL로 렌더링해야 합니다.
+        </div>
+      </section>
+
+      <section id="schema">
+        <div class="lined"><span class="lined-label">STEP 04 — MAPPING</span></div>
+        <h2>4. 시트 스키마 매핑</h2>
+        <p>스프레드시트의 컬럼을 대시보드 내부 모델에 매핑합니다. 현재 시트 컬럼 구조 기준:</p>
+        <table>
+          <thead>
+            <tr><th>시트 컬럼</th><th>내부 키</th><th>타입</th><th>비고</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>A 주차</td><td class="col-mono">week</td><td class="col-mono">string</td><td>예: "5월 1주차" — 표시용</td></tr>
+            <tr><td>B 날짜</td><td class="col-mono">date</td><td class="col-mono">YYYY.MM.DD</td><td>정렬/필터 키</td></tr>
+            <tr><td>C 매체</td><td class="col-mono">media</td><td class="col-mono">enum</td><td>네이버 S/A, 구글, Meta…</td></tr>
+            <tr><td>D 캠페인</td><td class="col-mono">campaign</td><td class="col-mono">string</td><td>그룹핑 차원</td></tr>
+            <tr><td>E 광고그룹</td><td class="col-mono">adGroup</td><td class="col-mono">string</td><td></td></tr>
+            <tr><td>F 기기</td><td class="col-mono">device</td><td class="col-mono">PC | MO</td><td></td></tr>
+            <tr><td>G 노출수</td><td class="col-mono">impressions</td><td class="col-mono">int</td><td>측정 지표</td></tr>
+            <tr><td>H 클릭수</td><td class="col-mono">clicks</td><td class="col-mono">int</td><td></td></tr>
+            <tr><td>I 비용(KRW)</td><td class="col-mono">cost</td><td class="col-mono">int</td><td>원 단위</td></tr>
+            <tr><td>J 전환수</td><td class="col-mono">conversions</td><td class="col-mono">int</td><td></td></tr>
+            <tr><td>K 매출</td><td class="col-mono">revenue</td><td class="col-mono">int</td><td>원 단위</td></tr>
+          </tbody>
+        </table>
+        <p>파생 지표(CTR, CPC, CPA, ROAS)는 클라이언트에서 계산합니다:</p>
+        <pre>CTR  = clicks / impressions
+CPC  = cost / clicks
+CPA  = cost / conversions
+ROAS = revenue / cost</pre>
+      </section>
+
+      <section id="auth-patterns">
+        <div class="lined"><span class="lined-label">STEP 05 — AUTH</span></div>
+        <h2>5. 인증 패턴</h2>
+
+        <h3>패턴 A — Apps Script 웹앱 (가장 간단)</h3>
+        <p>시트의 <code>확장 프로그램 → Apps Script</code>에 코드를 붙여 넣고 웹앱으로 배포. 별도 키 관리 불필요.</p>
+        <pre><span class="c">// Code.gs</span>
+<span class="k">function</span> <span class="n">doGet</span>(e) {
+  <span class="k">const</span> sheet = SpreadsheetApp.<span class="n">getActiveSpreadsheet</span>()
+                          .<span class="n">getSheetByName</span>(<span class="s">"campaign-perf"</span>);
+  <span class="k">const</span> values = sheet.<span class="n">getDataRange</span>().<span class="n">getValues</span>();
+  <span class="k">return</span> ContentService
+    .<span class="n">createTextOutput</span>(<span class="n">JSON</span>.<span class="n">stringify</span>(values))
+    .<span class="n">setMimeType</span>(ContentService.MimeType.JSON);
+}</pre>
+        <p>대시보드에서는:</p>
+        <pre><span class="k">const</span> rows = <span class="k">await</span> <span class="n">fetch</span>(<span class="s">"https://script.google.com/macros/s/XXX/exec"</span>)
+                  .<span class="n">then</span>(r =&gt; r.<span class="n">json</span>());</pre>
+
+        <h3>패턴 B — 서비스 계정 (백엔드 + 비공개 시트)</h3>
+        <pre><span class="c">// Node.js / googleapis</span>
+<span class="k">import</span> { google } <span class="k">from</span> <span class="s">'googleapis'</span>;
+<span class="k">const</span> auth = <span class="k">new</span> google.<span class="n">auth</span>.<span class="n">GoogleAuth</span>({
+  keyFile: <span class="s">'./service-account.json'</span>,
+  scopes: [
+    <span class="s">'https://www.googleapis.com/auth/spreadsheets.readonly'</span>,
+    <span class="s">'https://www.googleapis.com/auth/drive.readonly'</span>,
+  ],
+});
+<span class="k">const</span> sheets = google.<span class="n">sheets</span>({ version: <span class="s">'v4'</span>, auth });
+<span class="k">const</span> res = <span class="k">await</span> sheets.spreadsheets.values.<span class="n">get</span>({
+  spreadsheetId: SHEET_ID,
+  range: <span class="s">'campaign-perf!A:K'</span>,
+});</pre>
+
+        <h3>패턴 C — OAuth 2.0 (사용자별 시트)</h3>
+        <p>각 사용자가 자신의 시트를 보게 하려면 OAuth 동의 화면을 통해 토큰을 받습니다. Google Identity Services(GIS) JS 라이브러리 사용 권장.</p>
+      </section>
+
+      <section id="refresh">
+        <div class="lined"><span class="lined-label">STEP 06 — SYNC</span></div>
+        <h2>6. 자동 동기화</h2>
+        <ul>
+          <li><b>폴링:</b> 대시보드에서 5~10분마다 fetch — 가장 단순.</li>
+          <li><b>Pub/Sub 푸시 알림:</b> 시트 변경 시 Drive Changes API가 웹훅 전송. 실시간 가능.</li>
+          <li><b>Apps Script 트리거:</b> 시트 수정 시 자동으로 캐시 무효화 호출.</li>
+        </ul>
+        <pre><span class="c">// 클라이언트 폴링 예시</span>
+<span class="n">setInterval</span>(<span class="k">async</span> () =&gt; {
+  <span class="k">const</span> fresh = <span class="k">await</span> <span class="n">fetchRows</span>();
+  store.<span class="n">setRows</span>(fresh);
+}, 5 * 60 * 1000);</pre>
+      </section>
+
+      <section id="checklist">
+        <div class="lined"><span class="lined-label">FINAL</span></div>
+        <h2>최종 체크리스트</h2>
+        <div class="checklist">
+          <label><input type="checkbox"/> GCP 프로젝트 생성 및 Sheets/Drive API 활성화</label>
+          <label><input type="checkbox"/> 자격증명 (API 키 / OAuth / 서비스 계정) 생성</label>
+          <label><input type="checkbox"/> API 키는 referer 제한 적용</label>
+          <label><input type="checkbox"/> 시트 공유 권한 설정 (뷰어 추가 또는 공개)</label>
+          <label><input type="checkbox"/> 시트 컬럼 헤더 행이 1행에 있는지 확인 (A:K)</label>
+          <label><input type="checkbox"/> Drive 소재 폴더 명명 규칙 정의 및 적용</label>
+          <label><input type="checkbox"/> 소재 폴더 공유 권한 설정</label>
+          <label><input type="checkbox"/> 환경변수에 SHEET_ID, FOLDER_ID, API_KEY 저장</label>
+          <label><input type="checkbox"/> 자동 동기화 주기 결정 (폴링 / 푸시)</label>
+          <label><input type="checkbox"/> 로컬에서 데이터 호출 테스트 완료</label>
+          <label><input type="checkbox"/> 프로덕션 배포 후 referer/CORS 확인</label>
+        </div>
+      </section>
+
+      <div style="margin-top:48px; padding-top:24px; border-top:1px solid var(--border); font-size:12px; color:var(--muted);">
+        <p>이 가이드는 캠페인 성과 대시보드 v1.0 시안과 함께 제공됩니다. 추가 질문은 데이터팀으로 문의해 주세요.</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+  // simple scroll-spy
+  const links = document.querySelectorAll('nav a');
+  const sections = [...links].map(a => document.querySelector(a.getAttribute('href')));
+  function updateActive() {
+    let active = 0;
+    for (let i = 0; i < sections.length; i++) {
+      if (sections[i].getBoundingClientRect().top < 100) active = i;
+    }
+    links.forEach((l, i) => l.classList.toggle('active', i === active));
+  }
+  window.addEventListener('scroll', updateActive);
+  updateActive();
+</script>
+</body>
+</html>
