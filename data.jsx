@@ -290,9 +290,10 @@ async function loadCreatives(config){
       D.creativesLoadError = err.message;
     }
   }
-  D.CREATIVES = buildMockCreatives();
-  D.creativesAreMock = true;
-  D.creativesSource = "샘플 소재";
+  // GDRIVE_FOLDER_ID 미설정 시 빈 목록 (패널에 안내 메시지 표시)
+  D.CREATIVES = [];
+  D.creativesAreMock = false;
+  D.creativesSource = "미연결 (GDRIVE_FOLDER_ID 필요)";
 }
 
 // ─── aggregation helpers ──────────────────────────────────
@@ -453,9 +454,9 @@ const _hasCredentials = !!(window.CONFIG?.SHEET_ID && window.CONFIG?.API_KEY);
 window.DASH = {
   MEDIA: MEDIA_DEFAULT, CAMPAIGNS: CAMPAIGNS_DEFAULT, DEVICES,
   ROWS: _hasCredentials ? [] : buildMockRows(),
-  CREATIVES: buildMockCreatives(),
+  CREATIVES: [],
   isMock: !_hasCredentials, source: _hasCredentials ? "불러오는 중…" : "샘플 데이터", loadError: null,
-  creativesAreMock: true, creativesSource: "샘플 소재", creativesLoadError: null,
+  creativesAreMock: false, creativesSource: "미연결", creativesLoadError: null,
   // api
   load, totals, byDay, byWeek, byMonth, byMedia, byCampaign, byDevice, prevPeriodRows, fmt,
 };
