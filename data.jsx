@@ -83,6 +83,41 @@ function buildMockRows(){
   return rows;
 }
 
+// ─── Column auto-detection ───────────────────────────────
+const COLUMN_KEYWORDS = {
+  week:        ["주차", "week", "주"],
+  date:        ["날짜", "date", "일자", "일"],
+  media:       ["매체", "media", "채널", "channel", "플랫폼", "platform", "매체명"],
+  campaign:    ["캠페인", "campaign", "캠페인명"],
+  adGroup:     ["광고그룹", "adgroup", "ad_group", "ad group", "그룹", "광고그룹명"],
+  device:      ["기기", "device", "디바이스"],
+  impressions: ["노출수", "노출", "impression", "impressions", "imp", "노출량"],
+  clicks:      ["클릭수", "클릭", "click", "clicks"],
+  cost:        ["비용", "cost", "광고비", "지출", "spend", "금액", "집행금액", "소진금액"],
+  conversions: ["전환수", "전환", "conversion", "conversions", "conv", "전환량"],
+  revenue:     ["매출", "revenue", "수익", "매출액", "전환매출"],
+};
+
+function autoDetectColumns(headers) {
+  const detected = {};
+  const usedIdx = new Set();
+  for (const [field, keywords] of Object.entries(COLUMN_KEYWORDS)) {
+    for (const kw of keywords) {
+      const i = headers.findIndex(h => {
+        const norm = String(h).trim().toLowerCase().replace(/\s+/g, "");
+        const k = kw.toLowerCase().replace(/\s+/g, "");
+        return norm === k || norm.includes(k);
+      });
+      if (i >= 0 && !usedIdx.has(i)) {
+        detected[field] = headers[i];
+        usedIdx.add(i);
+        break;
+      }
+    }
+  }
+  return detected;
+}
+
 // ─── Google Sheets loader ─────────────────────────────────
 async function loadFromSheets(config){
   const { SHEET_ID, RANGE, API_KEY, COLUMNS } = config;
@@ -93,8 +128,17 @@ async function loadFromSheets(config){
   const { values } = await res.json();
   if (!values || values.length < 2) throw new Error("Sheet has no data rows");
   const headers = values[0];
+
+  // manual COLUMNS takes priority; auto-detect fills in the rest
+  const manualCols = COLUMNS && Object.keys(COLUMNS).length ? COLUMNS : {};
+  const autoCols = autoDetectColumns(headers);
+  const mergedCols = { ...autoCols, ...manualCols };
+  window.DASH.detectedColumns = { auto: autoCols, manual: manualCols, merged: mergedCols, headers };
+  console.info("[DASH] 컬럼 자동감지:", autoCols);
+  console.info("[DASH] 최종 컬럼 매핑:", mergedCols);
+
   const idx = {};
-  for (const [field, headerName] of Object.entries(COLUMNS || {})) {
+  for (const [field, headerName] of Object.entries(mergedCols)) {
     const i = headers.findIndex(h => String(h).trim() === String(headerName).trim());
     if (i >= 0) idx[field] = i;
   }
