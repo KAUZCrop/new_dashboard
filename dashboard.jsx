@@ -88,12 +88,25 @@ function TerminalDashboard(){
   const campAgg  = D.byCampaign(rows);
   const devAgg   = D.byDevice(rows);
 
+  // campaign goal type map (ROAS / CPA) — built from all rows so it survives filtering
+  const campaignGoalMap = React.useMemo(() => {
+    const map = new Map();
+    D.ROWS.forEach(r => {
+      if (r.campaign && r.goalType && !map.has(r.campaign)) {
+        const t = String(r.goalType).toUpperCase().trim();
+        map.set(r.campaign, t.includes("CPA") ? "CPA" : "ROAS");
+      }
+    });
+    return map;
+  }, []);
+  const isCPA = activeCampaign !== "ALL" && campaignGoalMap.get(activeCampaign) === "CPA";
+
   // delta helper
   const delta = (a, b) => b ? ((a-b)/b) : 0;
 
   // ─── KPI cards ───────────────────────────────────────────
   const dailyForSpark = D.byDay(rows); // sparklines always at day grain
-  const kpis = [
+  const allKpis = [
     { code:"IMP",  label:"노출",     value:D.fmt.intShort(t.impressions),  delta: delta(t.impressions, tp.impressions),  spark: dailyForSpark.map(d=>({value:d.impressions})), color: TerminalTheme.blue },
     { code:"CLK",  label:"클릭",     value:D.fmt.intShort(t.clicks),       delta: delta(t.clicks, tp.clicks),            spark: dailyForSpark.map(d=>({value:d.clicks})),      color: TerminalTheme.cyan },
     { code:"CTR",  label:"클릭률",   value:D.fmt.pct(t.ctr),               delta: delta(t.ctr, tp.ctr),                  spark: dailyForSpark.map(d=>({value:d.ctr})),         color: TerminalTheme.magenta },
@@ -103,6 +116,7 @@ function TerminalDashboard(){
     { code:"REV",  label:"매출",     value:D.fmt.krwShort(t.revenue),      delta: delta(t.revenue, tp.revenue),          spark: dailyForSpark.map(d=>({value:d.revenue})),     color: TerminalTheme.accent },
     { code:"ROAS", label:"ROAS",    value:t.roas.toFixed(2)+"×",          delta: delta(t.roas, tp.roas),                spark: dailyForSpark.map(d=>({value:d.roas})),        color: TerminalTheme.green },
   ];
+  const kpis = isCPA ? allKpis.filter(k => k.code !== "REV" && k.code !== "ROAS") : allKpis;
 
   // ─── ad-group rollup ────────────────────────────────────
   const adGroupMap = new Map();
@@ -209,7 +223,11 @@ function TerminalDashboard(){
       dashed: comparison?[1]:[],
     },
   };
-  const currentMetric = metricConfigs[chartMetric];
+  const visibleMetricKeys = isCPA
+    ? Object.keys(metricConfigs).filter(k => k !== "rev_cost" && k !== "roas")
+    : Object.keys(metricConfigs);
+  const safeChartMetric = visibleMetricKeys.includes(chartMetric) ? chartMetric : visibleMetricKeys[0];
+  const currentMetric = metricConfigs[safeChartMetric];
 
   // ─── render ──────────────────────────────────────────────
   return (
@@ -281,7 +299,7 @@ function TerminalDashboard(){
       </div>
 
       {/* KPI STRIP */}
-      <div style={S.kpiRow}>
+      <div style={{...S.kpiRow, gridTemplateColumns:`repeat(${kpis.length},1fr)`}}>
         {kpis.map(k => {
           const goodSign = k.lowerIsBetter ? (k.delta < 0) : (k.delta > 0);
           const dColor = Math.abs(k.delta) < 0.005 ? TerminalTheme.muted : goodSign ? TerminalTheme.green : TerminalTheme.red;
@@ -313,8 +331,8 @@ function TerminalDashboard(){
           <div style={S.panelHead}>
             <span style={S.panelTitle}>[01] {granularity==="day"?"DAILY":granularity==="week"?"WEEKLY":"MONTHLY"} TREND · {currentMetric.label.toUpperCase()}</span>
             <div style={S.metricTabs}>
-              {Object.entries(metricConfigs).map(([k, m]) => (
-                <button key={k} style={chartMetric===k?S.metricTabActive:S.metricTab} onClick={()=>setChartMetric(k)}>{m.label}</button>
+              {visibleMetricKeys.map(k => (
+                <button key={k} style={safeChartMetric===k?S.metricTabActive:S.metricTab} onClick={()=>setChartMetric(k)}>{metricConfigs[k].label}</button>
               ))}
             </div>
           </div>
@@ -337,124 +355,25 @@ function TerminalDashboard(){
           </div>
         </div>
 
-        {/* [02] BY MEDIA */}
-        <div style={{...S.panel, gridColumn:"span 4"}}>
-          <div style={S.panelHead}>
-            <span style={S.panelTitle}>[02] BY MEDIA · REVENUE</span>
-            <span style={{...S.muted, fontSize:9}}>{mediaAgg.length} channels</span>
-          </div>
-          <div style={{padding:"6px 16px 12px"}}>
-            <table style={S.mediaTable}>
-              <thead>
-                <tr>
-                  <th style={S.mediaTh}>MEDIA</th>
-                  <th style={S.mediaThN}>REV</th>
-                  <th style={S.mediaThN}>SHARE</th>
-                  <th style={S.mediaThN}>ROAS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mediaAgg.map((m,i)=>{
-                  const total = mediaAgg.reduce((a,b)=>a+b.revenue,0);
-                  const pct = m.revenue/total;
-                  const color = TerminalTheme.accents[i%TerminalTheme.accents.length];
-                  return (
-                    <tr key={m.key}>
-                      <td style={S.mediaTd}>
-                        <span style={{...S.mediaDot, background:color}}/>
-                        {m.label}
-                      </td>
-                      <td style={S.mediaTdN}>{D.fmt.krwShort(m.revenue)}</td>
-                      <td style={S.mediaTdN}>
-                        <div style={S.mediaBarTrack}>
-                          <div style={{...S.mediaBarFill, width:(pct*100)+"%", background:color}}/>
-                        </div>
-                        <span style={{fontFamily:TerminalTheme.monoFont, fontSize:9, color:TerminalTheme.muted}}>{(pct*100).toFixed(1)}%</span>
-                      </td>
-                      <td style={{...S.mediaTdN, color: m.roas>3?TerminalTheme.green:m.roas<1.5?TerminalTheme.red:TerminalTheme.fg, fontWeight:600}}>{m.roas.toFixed(2)}×</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* [03] BY CAMPAIGN (donut) */}
-        <div style={{...S.panel, gridColumn:"span 4"}}>
-          <div style={S.panelHead}>
-            <span style={S.panelTitle}>[03] REV MIX · CAMPAIGN</span>
-            <span style={{...S.muted, fontSize:9}}>TOP {Math.min(6,campAgg.length)}</span>
-          </div>
-          <div style={{display:"flex", flexDirection:"column", padding:"16px 16px 14px", alignItems:"center", gap:14}}>
-            <Donut data={campAgg.slice(0,6).map(c=>({label:c.label, value:c.revenue}))} size={170} theme={TerminalTheme} format="krw"/>
-            <div style={{width:"100%", display:"grid", gridTemplateColumns:"1fr 1fr", columnGap:14, rowGap:6}}>
-              {campAgg.slice(0,6).map((c,i)=>{
-                const total = campAgg.reduce((a,b)=>a+b.revenue,0);
-                return (
-                  <div key={c.key} style={S.legendRow}>
-                    <span style={{...S.legendSwatch, background:TerminalTheme.accents[i % TerminalTheme.accents.length]}}/>
-                    <div style={{flex:1, minWidth:0}}>
-                      <div style={S.legendLabel}>{c.label}</div>
-                      <div style={{fontSize:9, color:TerminalTheme.faint, fontFamily:TerminalTheme.monoFont, marginTop:1}}>{(c.revenue/total*100).toFixed(1)}% · {D.fmt.krwShort(c.revenue)}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* [04] BY DEVICE */}
-        <div style={{...S.panel, gridColumn:"span 4"}}>
-          <div style={S.panelHead}>
-            <span style={S.panelTitle}>[04] BY DEVICE</span>
-            <span style={{...S.muted, fontSize:9}}>PC + MO</span>
-          </div>
-          <div style={{padding:"16px 18px 14px", display:"flex", flexDirection:"column", gap:14}}>
-            {devAgg.map(d => {
-              const total = devAgg.reduce((a,b)=>a+b.revenue,0);
-              const pct = total ? d.revenue/total : 0;
-              const color = d.key==="PC" ? TerminalTheme.blue : TerminalTheme.accent;
-              return (
-                <div key={d.key}>
-                  <div style={{display:"flex", justifyContent:"space-between", marginBottom:6}}>
-                    <span style={{fontSize:12, color:TerminalTheme.fg, fontWeight:700, fontFamily:TerminalTheme.monoFont, letterSpacing:0.5}}>{d.label.toUpperCase()}</span>
-                    <span style={{fontSize:11, color:TerminalTheme.muted, fontFamily:TerminalTheme.monoFont}}>{(pct*100).toFixed(1)}% · {D.fmt.krwShort(d.revenue)}</span>
-                  </div>
-                  <div style={{...S.mediaBarTrack, width:"100%", height:8}}>
-                    <div style={{...S.mediaBarFill, width:(pct*100)+"%", background:color}}/>
-                  </div>
-                  <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:1, marginTop:8, background:TerminalTheme.border}}>
-                    <MiniStat label="CTR"  value={D.fmt.pct(d.ctr)}/>
-                    <MiniStat label="CPA"  value={"₩"+Math.round(d.cpa).toLocaleString()}/>
-                    <MiniStat label="ROAS" value={d.roas.toFixed(2)+"×"} color={d.roas>3?TerminalTheme.green:d.roas<1.5?TerminalTheme.red:TerminalTheme.fg}/>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* [05] WEEKLY SUMMARY 주차별 요약 */}
+        {/* [02] WEEKLY SUMMARY 주차별 요약 */}
         <div style={{...S.panel, gridColumn:"span 12"}}>
           <div style={S.panelHead}>
-            <span style={S.panelTitle}>[05] WEEKLY SUMMARY · 주차별 요약</span>
+            <span style={S.panelTitle}>[02] WEEKLY SUMMARY · 주차별 요약</span>
             <span style={{...S.muted, fontSize:9}}>{D.byWeek(rows).length}주 · 합계 포함</span>
           </div>
           <div style={{overflowX:"auto"}}>
-            <DetailTable rows={D.byWeek(rows)} keyLabel="주차" totals={t} D={D}/>
+            <DetailTable rows={D.byWeek(rows)} keyLabel="주차" totals={t} D={D} isCPA={isCPA}/>
           </div>
         </div>
 
         {/* [06] DAILY DETAIL 일자별 상세 */}
         <div style={{...S.panel, gridColumn:"span 12"}}>
           <div style={S.panelHead}>
-            <span style={S.panelTitle}>[06] DAILY DETAIL · 일자별 상세</span>
+            <span style={S.panelTitle}>[03] DAILY DETAIL · 일자별 상세</span>
             <span style={{...S.muted, fontSize:9}}>{D.byDay(rows).length}일 · 합계 포함</span>
           </div>
           <div style={{maxHeight:520, overflowY:"auto", overflowX:"auto"}}>
-            <DetailTable rows={D.byDay(rows)} keyLabel="날짜" totals={t} D={D} highlightWeekend/>
+            <DetailTable rows={D.byDay(rows)} keyLabel="날짜" totals={t} D={D} highlightWeekend isCPA={isCPA}/>
           </div>
         </div>
 
@@ -548,11 +467,11 @@ function TerminalDashboard(){
           </div>
         </div>
 
-        {/* [06] TOP AD-GROUPS */}
+        {/* [05] TOP AD-GROUPS */}
         <div style={{...S.panel, gridColumn:"span 12"}}>
           <div style={S.panelHead}>
-            <span style={S.panelTitle}>[08] TOP AD-GROUPS · 성과 상위 {adGroups.length}</span>
-            <span style={{...S.muted, fontSize:9}}>SORT: REVENUE DESC</span>
+            <span style={S.panelTitle}>[05] TOP AD-GROUPS · 성과 상위 {adGroups.length}</span>
+            <span style={{...S.muted, fontSize:9}}>{isCPA ? "SORT: CPA ASC" : "SORT: REVENUE DESC"}</span>
           </div>
           <div style={{overflowX:"auto"}}>
             <table style={S.table}>
@@ -568,15 +487,16 @@ function TerminalDashboard(){
                   <th style={S.thN}>CPC</th>
                   <th style={S.thN}>CONV</th>
                   <th style={S.thN}>CPA</th>
-                  <th style={S.thN}>REV</th>
-                  <th style={S.thN}>ROAS</th>
+                  {!isCPA && <th style={S.thN}>REV</th>}
+                  {!isCPA && <th style={S.thN}>ROAS</th>}
                   <th style={{...S.thN, width:90}}>TREND 7D</th>
                 </tr>
               </thead>
               <tbody>
                 {adGroups.map((g,i) => {
                   const gRows = rows.filter(r=>r.campaignLabel===g.campaign && r.mediaLabel===g.media && r.device===g.device);
-                  const dailyG = D.byDay(gRows).slice(-7).map(d=>({value:d.revenue}));
+                  const trendVal = isCPA ? d=>({value:d.cpa}) : d=>({value:d.revenue});
+                  const dailyG = D.byDay(gRows).slice(-7).map(trendVal);
                   return (
                     <tr key={g.key} style={i%2?S.trAlt:S.tr}>
                       <td style={{...S.tdN, color:TerminalTheme.faint}}>{String(i+1).padStart(2,"0")}</td>
@@ -589,9 +509,9 @@ function TerminalDashboard(){
                       <td style={S.tdN}>₩{Math.round(g.clicks?g.cost/g.clicks:0).toLocaleString()}</td>
                       <td style={S.tdN}>{D.fmt.intShort(g.conversions)}</td>
                       <td style={{...S.tdN, color:TerminalTheme.red}}>₩{Math.round(g.cpa).toLocaleString()}</td>
-                      <td style={{...S.tdN, color:TerminalTheme.accent}}>{D.fmt.krwShort(g.revenue)}</td>
-                      <td style={{...S.tdN, color: g.roas>3?TerminalTheme.green:TerminalTheme.red, fontWeight:600}}>{g.roas.toFixed(2)}×</td>
-                      <td style={{...S.tdN, padding:"2px 8px"}}><Sparkline data={dailyG} width={80} height={18} color={TerminalTheme.accent}/></td>
+                      {!isCPA && <td style={{...S.tdN, color:TerminalTheme.accent}}>{D.fmt.krwShort(g.revenue)}</td>}
+                      {!isCPA && <td style={{...S.tdN, color: g.roas>3?TerminalTheme.green:TerminalTheme.red, fontWeight:600}}>{g.roas.toFixed(2)}×</td>}
+                      <td style={{...S.tdN, padding:"2px 8px"}}><Sparkline data={dailyG} width={80} height={18} color={isCPA?TerminalTheme.red:TerminalTheme.accent}/></td>
                     </tr>
                   );
                 })}
@@ -664,7 +584,7 @@ function SlicerBox({active}){
   );
 }
 
-function DetailTable({rows, keyLabel, totals, D, highlightWeekend}){
+function DetailTable({rows, keyLabel, totals, D, highlightWeekend, isCPA}){
   const S = terminalStyles;
   return (
     <table style={S.detailTable}>
@@ -673,7 +593,7 @@ function DetailTable({rows, keyLabel, totals, D, highlightWeekend}){
           <th style={{...S.detailGroupTh, width:90}}></th>
           <th colSpan={5} style={{...S.detailGroupTh, color:TerminalTheme.blue}}>광고 유입 · TRAFFIC</th>
           <th colSpan={3} style={{...S.detailGroupTh, color:TerminalTheme.green}}>전환 · CONVERSION</th>
-          <th colSpan={2} style={{...S.detailGroupTh, color:TerminalTheme.accent}}>매출 · REVENUE</th>
+          {!isCPA && <th colSpan={2} style={{...S.detailGroupTh, color:TerminalTheme.accent}}>매출 · REVENUE</th>}
         </tr>
         <tr>
           <th style={S.detailTh}>{keyLabel}</th>
@@ -685,8 +605,8 @@ function DetailTable({rows, keyLabel, totals, D, highlightWeekend}){
           <th style={S.detailThN}>전환수</th>
           <th style={S.detailThN}>CPA</th>
           <th style={S.detailThN}>전환율</th>
-          <th style={S.detailThN}>매출</th>
-          <th style={S.detailThN}>ROAS</th>
+          {!isCPA && <th style={S.detailThN}>매출</th>}
+          {!isCPA && <th style={S.detailThN}>ROAS</th>}
         </tr>
       </thead>
       <tbody>
@@ -694,8 +614,8 @@ function DetailTable({rows, keyLabel, totals, D, highlightWeekend}){
           let weekendColor = TerminalTheme.fg;
           if (highlightWeekend && r.date && r.date.includes(".")) {
             const dow = new Date(r.date.replace(/\./g,"-")).getDay();
-            if (dow === 0) weekendColor = TerminalTheme.red;   // 일요일
-            else if (dow === 6) weekendColor = TerminalTheme.blue; // 토요일
+            if (dow === 0) weekendColor = TerminalTheme.red;
+            else if (dow === 6) weekendColor = TerminalTheme.blue;
           }
           const cvr = r.clicks ? r.conversions / r.clicks : 0;
           return (
@@ -711,12 +631,11 @@ function DetailTable({rows, keyLabel, totals, D, highlightWeekend}){
               <td style={S.detailTdN}>{D.fmt.int(r.conversions)}</td>
               <td style={{...S.detailTdN, color:TerminalTheme.red}}>₩{Math.round(r.cpa).toLocaleString()}</td>
               <td style={{...S.detailTdN, color:TerminalTheme.magenta}}>{D.fmt.pct(cvr)}</td>
-              <td style={{...S.detailTdN, color:TerminalTheme.accent, fontWeight:600}}>{D.fmt.krwShort(r.revenue)}</td>
-              <td style={{...S.detailTdN, color: r.roas>3?TerminalTheme.green:r.roas<1.5?TerminalTheme.red:TerminalTheme.fg, fontWeight:600}}>{r.roas.toFixed(2)}×</td>
+              {!isCPA && <td style={{...S.detailTdN, color:TerminalTheme.accent, fontWeight:600}}>{D.fmt.krwShort(r.revenue)}</td>}
+              {!isCPA && <td style={{...S.detailTdN, color: r.roas>3?TerminalTheme.green:r.roas<1.5?TerminalTheme.red:TerminalTheme.fg, fontWeight:600}}>{r.roas.toFixed(2)}×</td>}
             </tr>
           );
         })}
-        {/* 합계 */}
         <tr style={S.detailTotalRow}>
           <td style={{...S.detailTd, fontWeight:700}}>합계</td>
           <td style={{...S.detailTdN, fontWeight:700}}>{D.fmt.int(totals.impressions)}</td>
@@ -727,8 +646,8 @@ function DetailTable({rows, keyLabel, totals, D, highlightWeekend}){
           <td style={{...S.detailTdN, fontWeight:700}}>{D.fmt.int(totals.conversions)}</td>
           <td style={{...S.detailTdN, fontWeight:700, color:TerminalTheme.red}}>₩{Math.round(totals.cpa).toLocaleString()}</td>
           <td style={{...S.detailTdN, fontWeight:700, color:TerminalTheme.magenta}}>{D.fmt.pct(totals.clicks ? totals.conversions/totals.clicks : 0)}</td>
-          <td style={{...S.detailTdN, fontWeight:700, color:TerminalTheme.accent}}>{D.fmt.krwShort(totals.revenue)}</td>
-          <td style={{...S.detailTdN, fontWeight:700, color: totals.roas>3?TerminalTheme.green:totals.roas<1.5?TerminalTheme.red:TerminalTheme.fg}}>{totals.roas.toFixed(2)}×</td>
+          {!isCPA && <td style={{...S.detailTdN, fontWeight:700, color:TerminalTheme.accent}}>{D.fmt.krwShort(totals.revenue)}</td>}
+          {!isCPA && <td style={{...S.detailTdN, fontWeight:700, color: totals.roas>3?TerminalTheme.green:totals.roas<1.5?TerminalTheme.red:TerminalTheme.fg}}>{totals.roas.toFixed(2)}×</td>}
         </tr>
       </tbody>
     </table>
