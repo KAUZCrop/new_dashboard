@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+*.log
+.vscode/
+.idea/
+
+# project state (locally edited canvas labels — not part of source)
+.design-canvas.state.json
+.dist/
