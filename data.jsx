@@ -96,7 +96,7 @@ const COLUMN_KEYWORDS = {
   cost:        ["비용", "cost", "광고비", "지출", "spend", "금액", "집행금액", "소진금액"],
   conversions: ["전환수", "전환", "conversion", "conversions", "conv", "전환량"],
   revenue:     ["매출", "revenue", "수익", "매출액", "전환매출"],
-  goalType:    ["목표유형", "목표 유형", "캠페인유형", "캠페인 유형", "목표타입", "목표", "유형", "goal_type", "goaltype", "campaign_type", "goal"],
+  goalType:    ["목표유형", "목표 유형", "캠페인유형", "캠페인 유형", "목표타입", "goal_type", "goaltype", "campaign_type"],
 };
 
 function autoDetectColumns(headers) {
