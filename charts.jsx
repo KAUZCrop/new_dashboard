@@ -5,16 +5,18 @@ const { useMemo, useState, useRef, useEffect } = React;
 
 // ============================== LineChart ==============================
 function LineChart({ series, width = 720, height = 220, theme, yKey = "value", showArea = true, showAxis = true, padding = { t: 16, r: 12, b: 22, l: 44 }, smooth = false, dashed = [], responsive = false }){
-  // series: [{ name, color?, data: [{x, [yKey]}] }]
+  const [tip, setTip] = useState(null);
+  const svgRef = useRef(null);
+
   const p = padding;
   const w = width - p.l - p.r, h = height - p.t - p.b;
   const allX = series[0]?.data.map(d=>d.x) || [];
   const maxY = Math.max(...series.flatMap(s=>s.data.map(d=>d[yKey]||0)), 1);
   const x = i => p.l + (w * i) / Math.max(allX.length-1, 1);
   const y = v => p.t + h - (h * v) / maxY;
+
   const path = (data) => {
     if (smooth){
-      // Catmull-Rom-ish bezier
       let d = "";
       data.forEach((pt,i)=>{
         const cx = x(i), cy = y(pt[yKey]);
@@ -32,29 +34,90 @@ function LineChart({ series, width = 720, height = 220, theme, yKey = "value", s
   const yticks = 4;
   const tickVals = Array.from({length:yticks+1}, (_,i)=> (maxY*i)/yticks);
 
+  const handleMouseMove = e => {
+    if (!svgRef.current || !allX.length) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const scaleX = width / rect.width;
+    const px = (e.clientX - rect.left) * scaleX;
+    const idx = Math.round((px - p.l) / w * (allX.length - 1));
+    const i = Math.max(0, Math.min(allX.length - 1, idx));
+    setTip({
+      i,
+      svgX: x(i),
+      label: allX[i],
+      values: series.map(s => ({ name: s.name, color: s.color || theme.accent, val: s.data[i]?.[yKey] ?? 0 })),
+    });
+  };
+
+  const fmtTip = v => {
+    if (!window.DASH) return v;
+    const D = window.DASH;
+    if (v >= 1e8) return D.fmt.krwShort(v);
+    if (v > 0 && v < 1) return D.fmt.pct(v);
+    return D.fmt.int(v);
+  };
+
   return (
-    <svg {...(responsive ? { width: "100%", height: "auto", viewBox: `0 0 ${width} ${height}`, preserveAspectRatio: "none" } : { width, height })} style={{ display:"block", fontFamily: theme.monoFont || theme.font, fontSize: 10 }}>
-      {showAxis && tickVals.map((v,i)=>(
-        <g key={i}>
-          <line x1={p.l} x2={p.l+w} y1={y(v)} y2={y(v)} stroke={theme.grid} strokeWidth={1} strokeDasharray={i===0?"":"2,3"} />
-          <text x={p.l-6} y={y(v)+3} fill={theme.muted} textAnchor="end">{window.DASH.fmt.intShort(v)}</text>
-        </g>
-      ))}
-      {showAxis && allX.map((xv,i)=> i % Math.ceil(allX.length/8)===0 && (
-        <text key={i} x={x(i)} y={p.t+h+14} fill={theme.muted} textAnchor="middle">{window.DASH.fmt.date(xv)}</text>
-      ))}
-      {series.map((s,si)=>{
-        const color = s.color || theme.accents?.[si] || theme.accent;
-        return (
-          <g key={si}>
-            {showArea && si===0 && (
-              <path d={area(s.data)} fill={color} opacity={0.10} />
-            )}
-            <path d={path(s.data)} fill="none" stroke={color} strokeWidth={1.5} strokeDasharray={dashed.includes(si)?"3,3":""} />
+    <div style={{ position:"relative" }}>
+      <svg
+        ref={svgRef}
+        {...(responsive ? { width:"100%", height:"auto", viewBox:`0 0 ${width} ${height}`, preserveAspectRatio:"none" } : { width, height })}
+        style={{ display:"block", fontFamily: theme.monoFont || theme.font, fontSize: 10, cursor:"crosshair" }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={()=>setTip(null)}
+      >
+        {showAxis && tickVals.map((v,i)=>(
+          <g key={i}>
+            <line x1={p.l} x2={p.l+w} y1={y(v)} y2={y(v)} stroke={theme.grid} strokeWidth={1} strokeDasharray={i===0?"":"2,3"} />
+            <text x={p.l-6} y={y(v)+3} fill={theme.muted} textAnchor="end">{window.DASH.fmt.intShort(v)}</text>
           </g>
-        );
-      })}
-    </svg>
+        ))}
+        {showAxis && allX.map((xv,i)=> i % Math.ceil(allX.length/8)===0 && (
+          <text key={i} x={x(i)} y={p.t+h+14} fill={theme.muted} textAnchor="middle">{window.DASH.fmt.date(xv)}</text>
+        ))}
+        {series.map((s,si)=>{
+          const color = s.color || theme.accents?.[si] || theme.accent;
+          return (
+            <g key={si}>
+              {showArea && si===0 && <path d={area(s.data)} fill={color} opacity={0.10} />}
+              <path d={path(s.data)} fill="none" stroke={color} strokeWidth={1.5} strokeDasharray={dashed.includes(si)?"3,3":""} />
+            </g>
+          );
+        })}
+        {tip && (
+          <g>
+            <line x1={tip.svgX} x2={tip.svgX} y1={p.t} y2={p.t+h} stroke={theme.muted} strokeWidth={1} strokeDasharray="3,3" opacity={0.7}/>
+            {tip.values.map((v,i) => {
+              const cy = y(v.val);
+              return <circle key={i} cx={tip.svgX} cy={cy} r={4} fill={v.color} stroke={theme.bg||"#fff"} strokeWidth={1.5}/>;
+            })}
+          </g>
+        )}
+      </svg>
+      {tip && (
+        <div style={{
+          position:"absolute", top: p.t, pointerEvents:"none", zIndex:10,
+          left: tip.svgX / width * 100 + "%",
+          transform: tip.i > allX.length * 0.7 ? "translateX(-105%)" : "translateX(8px)",
+        }}>
+          <div style={{
+            background: theme.fg, color: theme.bg || "#fff",
+            fontFamily: theme.monoFont, fontSize: 11, padding: "6px 10px",
+            minWidth: 110, boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          }}>
+            <div style={{ fontSize: 10, marginBottom: 5, opacity: 0.7, letterSpacing: 0.5 }}>
+              {window.DASH.fmt.date(tip.label)}
+            </div>
+            {tip.values.map((v,i) => (
+              <div key={i} style={{ display:"flex", justifyContent:"space-between", gap: 12, marginTop: i>0?3:0 }}>
+                <span style={{ color: v.color, fontSize: 10 }}>{v.name}</span>
+                <span style={{ fontWeight: 700 }}>{fmtTip(v.val)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -316,7 +316,7 @@ function TerminalDashboard(){
                 </div>
               )}
               <div style={{marginTop:4}}>
-                <SparklineWithTooltip data={k.spark} width={180} height={22} color={k.color} fmt={k.fmt}/>
+                <Sparkline data={k.spark} width={180} height={22} color={k.color} fill/>
               </div>
             </div>
           );
@@ -650,53 +650,6 @@ function DetailTable({rows, keyLabel, totals, D, highlightWeekend, isCPA}){
         </tr>
       </tbody>
     </table>
-  );
-}
-
-function SparklineWithTooltip({ data, width, height, color, fmt }){
-  const [tip, setTip] = React.useState(null);
-  const svgRef = React.useRef(null);
-  const max = Math.max(...data.map(d=>d.value), 1);
-  const min = Math.min(...data.map(d=>d.value), 0);
-  const range = (max - min) || 1;
-  const x = i => (width * i) / Math.max(data.length - 1, 1);
-  const y = v => height - 2 - ((height - 4) * (v - min)) / range;
-  const pts = data.map((d,i) => (i===0?"M":"L") + x(i).toFixed(1) + "," + y(d.value).toFixed(1)).join(" ");
-
-  const handleMove = e => {
-    if (!svgRef.current || !data.length) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const idx = Math.round((px / rect.width) * (data.length - 1));
-    const i = Math.max(0, Math.min(data.length - 1, idx));
-    setTip({ i, x: x(i), y: y(data[i].value), val: data[i].value, label: data[i].label });
-  };
-
-  return (
-    <div style={{ position:"relative", display:"inline-block" }}>
-      <svg ref={svgRef} width={width} height={height} style={{ display:"block", cursor:"crosshair" }}
-        onMouseMove={handleMove} onMouseLeave={()=>setTip(null)}>
-        <path d={pts + ` L${x(data.length-1)},${height} L0,${height} Z`} fill={color} opacity={0.18}/>
-        <path d={pts} fill="none" stroke={color} strokeWidth={1.25}/>
-        {tip && (
-          <>
-            <line x1={tip.x} x2={tip.x} y1={0} y2={height} stroke={color} strokeWidth={1} opacity={0.5} strokeDasharray="2,2"/>
-            <circle cx={tip.x} cy={tip.y} r={3} fill={color}/>
-          </>
-        )}
-      </svg>
-      {tip && (
-        <div style={{
-          position:"absolute", bottom: height + 4,
-          left: Math.min(tip.x - 2, width - 90),
-          background: TerminalTheme.fg, color: TerminalTheme.bg,
-          fontFamily: TerminalTheme.monoFont, fontSize: 10, fontWeight: 600,
-          padding: "3px 7px", pointerEvents: "none", whiteSpace: "nowrap", zIndex: 10,
-        }}>
-          {tip.label ? `${tip.label} ` : ""}{fmt ? fmt(tip.val) : tip.val}
-        </div>
-      )}
-    </div>
   );
 }
 
