@@ -424,29 +424,27 @@ async function load(config = {}){
       D.isMock = false;
       D.source = `Google Sheets · ${config.RANGE || "A:Z"} · ${rows.length}행`;
     } catch (err) {
-      console.warn("[DASH] Sheets load failed, falling back to mock:", err.message);
+      console.warn("[DASH] Sheets load failed:", err.message);
       D.loadError = err.message;
-      D.ROWS = buildMockRows();
-      D.isMock = true;
-      D.source = "샘플 데이터 (Sheets 로드 실패 → 폴백)";
+      D.ROWS = [];  // API 설정이 있으면 샘플 데이터 대신 빈 데이터
+      D.isMock = false;
+      D.source = "연결 실패";
     }
   } else {
     D.ROWS = buildMockRows();
     D.isMock = true;
-    D.source = "샘플 데이터 (config.js에서 SHEET_ID와 API_KEY를 설정하면 실제 시트 데이터를 불러옵니다)";
+    D.source = "샘플 데이터 (SHEET_ID와 API_KEY를 설정하세요)";
   }
   // creatives (Drive)
   await loadCreatives(config);
 }
 
+const _hasCredentials = !!(window.CONFIG?.SHEET_ID && window.CONFIG?.API_KEY);
 window.DASH = {
-  // populated by load()
   MEDIA: MEDIA_DEFAULT, CAMPAIGNS: CAMPAIGNS_DEFAULT, DEVICES,
-  // bootstrap with mock so synchronous consumers (e.g. preview canvas) work
-  // immediately; load() can overwrite asynchronously with real sheet data.
-  ROWS: buildMockRows(),
+  ROWS: _hasCredentials ? [] : buildMockRows(),
   CREATIVES: buildMockCreatives(),
-  isMock: true, source: "샘플 데이터", loadError: null,
+  isMock: !_hasCredentials, source: _hasCredentials ? "불러오는 중…" : "샘플 데이터", loadError: null,
   creativesAreMock: true, creativesSource: "샘플 소재", creativesLoadError: null,
   // api
   load, totals, byDay, byWeek, byMonth, byMedia, byCampaign, byDevice, prevPeriodRows, fmt,
