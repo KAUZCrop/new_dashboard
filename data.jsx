@@ -160,6 +160,13 @@ async function loadFromSheets(config){
     return row;
   });
   console.info("[DASH] 파싱된 첫 3행:", rows.slice(0, 3));
+  console.info("[DASH] 시트 2행 원본값:", values[1]);
+  if (rows[0]) console.info("[DASH] 첫 행 숫자필드:", {
+    impressions: rows[0].impressions,
+    clicks: rows[0].clicks,
+    cost: rows[0].cost,
+    conversions: rows[0].conversions,
+  });
   // derive unique media + campaign lists from the data
   const seenMedia = new Map(), seenCamp = new Map();
   rows.forEach(r => {
