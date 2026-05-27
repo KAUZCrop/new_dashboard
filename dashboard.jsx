@@ -222,13 +222,22 @@ function TerminalDashboard(){
   // ─── render ──────────────────────────────────────────────
   return (
     <div style={S.root}>
+      {/* API 오류 배너 */}
+      {D.loadError && (
+        <div style={{background:"#FEF2F2", borderBottom:"2px solid #B91C1C", padding:"10px 20px", display:"flex", gap:12, alignItems:"flex-start"}}>
+          <span style={{color:"#B91C1C", fontWeight:700, fontFamily:"monospace", fontSize:12}}>⚠ SHEETS API 오류</span>
+          <span style={{color:"#7F1D1D", fontSize:12, fontFamily:"monospace"}}>{D.loadError}</span>
+          <span style={{color:"#991B1B", fontSize:11, marginLeft:"auto"}}>스프레드시트 공유 설정(링크 공개) 및 API 키를 확인하세요</span>
+        </div>
+      )}
+
       {/* HEADER */}
       <div style={S.header}>
         <div style={S.headerL}>
           <span style={S.brand}>◆ {(window.CONFIG?.TITLE) || "CAMPAIGN.TERM"}</span>
           <span style={S.brandSub}>{(window.CONFIG?.SUBTITLE) || "AD-PERF MONITOR"}</span>
           <span style={S.statusDot}/>
-          <span style={{...S.muted, fontSize:10}}>{D.isMock ? "MOCK · " : "LIVE · "}{D.source}</span>
+          <span style={{...S.muted, fontSize:10}}>{D.isMock ? "⚠ MOCK DATA · " : "● LIVE · "}{D.source}</span>
         </div>
         <div style={S.headerR}>
           <span style={{...S.muted, fontSize:10, marginLeft:8, fontFamily:TerminalTheme.monoFont}}>{timeStr} KST</span>
