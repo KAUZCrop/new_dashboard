@@ -99,24 +99,35 @@ const COLUMN_KEYWORDS = {
   goalType:    ["목표유형", "목표 유형", "캠페인유형", "캠페인 유형", "목표타입", "goal_type", "goaltype", "campaign_type"],
 };
 
-function autoDetectColumns(headers) {
-  const detected = {};
+// autoDetect returns { field: columnIndex } directly — avoids double-lookup encoding issues
+function autoDetectColumnIndices(headers, manualColNames) {
+  const idx = {};
   const usedIdx = new Set();
+
+  // manual overrides first (field → headerName string → index)
+  for (const [field, headerName] of Object.entries(manualColNames || {})) {
+    const i = headers.findIndex(h => String(h).trim() === String(headerName).trim());
+    if (i >= 0 && !usedIdx.has(i)) { idx[field] = i; usedIdx.add(i); }
+  }
+
+  // auto-detect for remaining fields
   for (const [field, keywords] of Object.entries(COLUMN_KEYWORDS)) {
+    if (field in idx) continue;
     for (const kw of keywords) {
       const i = headers.findIndex(h => {
         const norm = String(h).trim().toLowerCase().replace(/\s+/g, "");
         const k = kw.toLowerCase().replace(/\s+/g, "");
         return norm === k || norm.includes(k);
       });
-      if (i >= 0 && !usedIdx.has(i)) {
-        detected[field] = headers[i];
-        usedIdx.add(i);
-        break;
-      }
+      if (i >= 0 && !usedIdx.has(i)) { idx[field] = i; usedIdx.add(i); break; }
     }
   }
-  return detected;
+
+  // log for debugging
+  const nameMap = {};
+  for (const [f, i] of Object.entries(idx)) nameMap[f] = `[${i}] ${headers[i]}`;
+  console.info("[DASH] 컬럼 인덱스 →", nameMap);
+  return idx;
 }
 
 // ─── Google Sheets loader ─────────────────────────────────
@@ -129,22 +140,12 @@ async function loadFromSheets(config){
   const { values } = await res.json();
   if (!values || values.length < 2) throw new Error("Sheet has no data rows");
   const headers = values[0];
+  console.info("[DASH] 시트 헤더:", headers);
 
-  // manual COLUMNS takes priority; auto-detect fills in the rest
   const manualCols = COLUMNS && Object.keys(COLUMNS).length ? COLUMNS : {};
-  const autoCols = autoDetectColumns(headers);
-  const mergedCols = { ...autoCols, ...manualCols };
-  window.DASH.detectedColumns = { auto: autoCols, manual: manualCols, merged: mergedCols, headers };
-  console.info("[DASH] 컬럼 자동감지:", autoCols);
-  console.info("[DASH] 최종 컬럼 매핑:", mergedCols);
+  const idx = autoDetectColumnIndices(headers, manualCols);
+  window.DASH.detectedColumns = { idx, headers };
 
-  const idx = {};
-  for (const [field, headerName] of Object.entries(mergedCols)) {
-    const i = headers.findIndex(h => String(h).trim() === String(headerName).trim());
-    if (i >= 0) idx[field] = i;
-  }
-  console.info("[DASH] 컬럼 인덱스:", idx);
-  console.info("[DASH] 헤더 전체:", headers);
   const numericField = k => ["impressions","clicks","cost","conversions","revenue"].includes(k);
   const rows = values.slice(1).filter(r => r.length).map((r, i) => {
     const row = { id: i };
