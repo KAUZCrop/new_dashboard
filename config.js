@@ -9,28 +9,17 @@
 
 window.CONFIG = {
   // ─── Google Sheets ─────────────────────────────────────
-  SHEET_ID: "",                 // 예: "1aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789"
-  RANGE:    "campaign-perf!A:K", // 시트탭이름!컬럼범위
-  API_KEY:  "",                 // GCP API 키
+  SHEET_ID: "1WJsAoDjLuFOf9GYksEADqHYtqb4d983C_NhxGlSRgus",
+  RANGE:    "총 RAW 데이터 정리!A:Z", // A:Z 전체 컬럼 → 자동감지
+  API_KEY:  "AIzaSyCcedehsEm9zrHr8CiZhBGcAGzJHJEvur4",
 
   // ─── (선택) Google Drive — 광고 소재 폴더 ─────────────
   GDRIVE_FOLDER_ID: "",         // 예: "1xYz0123..."
 
   // ─── 시트 컬럼 매핑 ────────────────────────────────────
-  //  내부 키(왼쪽)는 고정 — 시트 헤더 이름(오른쪽)만 본인 시트에 맞게 수정.
-  COLUMNS: {
-    week:        "주차",
-    date:        "날짜",
-    media:       "매체",
-    campaign:    "캠페인",
-    adGroup:     "광고그룹",
-    device:      "기기",
-    impressions: "노출수",
-    clicks:      "클릭수",
-    cost:        "비용(KRW)",
-    conversions: "전환수",
-    revenue:     "매출",
-  },
+  //  비워두면 헤더 이름으로 자동 감지합니다.
+  //  특정 컬럼 이름이 자동감지와 다를 때만 아래에 직접 지정하세요.
+  COLUMNS: {},
 
   // ─── 표시 옵션 ────────────────────────────────────────
   TITLE:        "CAMPAIGN.TERM",
